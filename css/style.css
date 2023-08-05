@@ -31,7 +31,7 @@ body {
 
 .slider__list {
     display: flex;
-    transition: all 1s ease 0s;
+    /* transition: all 1s ease 0s; */
 }
 
 .slider__item {

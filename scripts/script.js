@@ -4,8 +4,9 @@ const slider = function(opt) {
 
     const sliderBlock = document.querySelector('.slider');
     const sliderList = document.querySelector('#' + opt.name);
+    const listElems = sliderList.children;
 
-    if (!sliderList || sliderList.children.length <= 1) return;
+    if (!sliderList || listElems.length <= 1) return;
 
     const btnLeft = document.querySelector('#' + opt.btns.left);
     const btnRight = document.querySelector('#' + opt.btns.right);
@@ -19,74 +20,118 @@ const slider = function(opt) {
     const bullet3 = document.querySelector('#' + opt.bullets.n3);
     const bullet4 = document.querySelector('#' + opt.bullets.n4);
 
+    const LIMIT_OF_NEW_ELEMENTS = 5;
+    const STOP_POINT = 400;
+
     let time;
     let isFocus = false;
+    let isLimit = false;
+    let isWaiting = false;
+    let countNewElements = 0;
+
+    let x = sliderList.style.transform;
+    
+    if (!x) {
+        x = 0;
+    } else {
+        x = x.replace('translateX(', '');
+        x = x.replace('%)', '');
+        x = Math.abs(x);
+    }
 
     const images = sliderList.querySelectorAll('img');
 
     let imagesArr = [];
-    images.forEach(function(elem) {
-        let src = elem.getAttribute('src');
-        elem = src.replace('images/', '');
-        imagesArr.push(elem);
-    })
 
-    const reset = function() {
-        sliderList.style.transform = `translateX(0%)`;
-        x = 0;
-    }
+    const containImagesArr = function() {
 
-    // const elemAfter = function() {
+        images.forEach(function(elem) {
+            if (imagesArr.length == 5) return;
+            let src = elem.getAttribute('src');
+            elem = src.replace('images/', '');
+            imagesArr.push(elem);
+        });
+    };
 
-    //     const newListElem = document.createElement('div');
-    //     newListElem.classList.add('slider__item');
+    const elemAfter = function() {
+        if (countNewElements == LIMIT_OF_NEW_ELEMENTS) return;
 
-    //     let image = imagesArr.shift();
+        const newListElem = document.createElement('div');
+        newListElem.classList.add('slider__item');
+        newListElem.setAttribute('id', 'new');
 
-    //     let img = document.createElement('img');
-    //     img.setAttribute('src', `images/${image}`);
-    //     newListElem.setAttribute('id', 'new');
+        if (imagesArr.length == 0) containImagesArr();
 
-    //     newListElem.append(img);
-    //     sliderList.append(newListElem);
-    // }
+        let image = imagesArr.shift();
+
+        let img = document.createElement('img');
+        img.setAttribute('src', `images/${image}`);
+
+        newListElem.append(img);
+        sliderList.append(newListElem);
+
+        countNewElements++;
+    };
+
+    const createElemsAfter = function() {
+        if (countNewElements == LIMIT_OF_NEW_ELEMENTS) {
+            isLimit = true;
+            return;
+        };
+
+        elemAfter();
+        Array.from(listElems).forEach(function() {
+            createElemsAfter();
+        });
+    };
 
     const prevNext = function(btnElem = '') {
 
-        let x = sliderList.style.transform;
-        
-        if (!x) {
-            x = 0;
-        } else {
-            x = x.replace('translateX(', '');
-            x = x.replace('%)', '');
-            x = Math.abs(x);
-        }
+        isLimit = false;
+        sliderList.style.transition = 'transform 1s ease-in-out';
 
         const curBtn = btnElem.id;
         
         const dir = (curBtn === 'slider1_btn_left') ? 'prev' : 'next';
 
-        x += 20 * (dir == 'prev' ? -1 : 1);
+        x += 20 * (dir === 'prev' ? -1 : 1);
+        if (x > STOP_POINT) x = STOP_POINT;
+        if (dir === 'prev') isLimit = true;
 
-        let stopPoint = (sliderList.children.length - 1) * 20;
-        if (stopPoint > 380) stopPoint = 380;
-        if (x < 0) x = stopPoint;
-
-        let maxCountExtraElemsAfter = sliderList.querySelectorAll('#new');
-
-        if (maxCountExtraElemsAfter.length >= 5) isLimit = true;
-
-        if (x <= stopPoint) sliderList.style.transform = `translateX(-${x}%)`;
-        // if (x > (stopPoint - 100) && !isLimit) elemAfter();
+        if (x <= STOP_POINT) sliderList.style.transform = `translateX(-${x}%)`;
+        if (x > STOP_POINT - 100) elemAfter();
         
-        if (dir == 'prev' && x < 0) sliderList.style.transform = `translateX(-${stopPoint}%)`;
-        
+        if (dir == 'prev' && x < 0) {
+            createElemsAfter();
+            countNewElements = LIMIT_OF_NEW_ELEMENTS;
+            sliderList.style.transition = `none`;
+            sliderList.style.transform = `translateX(-${STOP_POINT - 20}%)`;
+            x = STOP_POINT - 20;
+            isLimit = true;
+            checkBulletStatus();
+        };
 
+        let maxCountExtraElemsAfter = '';
+
+        sliderList.addEventListener('transitionend', () => {
+            maxCountExtraElemsAfter = sliderList.querySelectorAll('#new');
+
+            if (countNewElements === LIMIT_OF_NEW_ELEMENTS && !isLimit && x === 400) {
+                sliderList.style.transition = `none`;
+                x = 0;
+                sliderList.style.transform = `translateX(-${x}%)`;
+                maxCountExtraElemsAfter.forEach(item => item.remove());
+                countNewElements = 0;
+            };
+            checkBulletStatus(x);
+        })
+    };
+
+    function checkBulletStatus() {
         bulletBtns.forEach(function(item) {
             item.classList.remove('active');
             switch (true) {
-                case x >= 400 || (x >= 0 && x < 100):
+                case x >= 0 && x < 100:
                     bullet1.classList.add('active');
                 break;
                 case x >= 100 && x < 200:
@@ -98,10 +143,8 @@ const slider = function(opt) {
                 case x >= 300 && x <= 400:
                     bullet4.classList.add('active');
                 break;
-            }
-        })
-        
-        if (x == 400) reset();
+            };
+        });
     };
 
     btnLeft.addEventListener('click', (event) => {
@@ -121,6 +164,8 @@ const slider = function(opt) {
             clearInterval(time);
             isFocus = true;
             const step = bullet.dataset.step;
+            x = +step;
+            sliderList.style.transition = 'transform 1s ease-in-out';
 
             bulletBtns.forEach(function(item) {
                 item.classList.remove('active');
